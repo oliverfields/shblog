@@ -1,0 +1,162 @@
+#!/bin/bash
+
+function error {
+  echo "Error: $*" >&2
+  exit 1
+}
+
+if [ -e "$blog_dir/blog.conf" ]; then
+  . "$blog_dir/blog.conf"
+else
+  error "Unable to load '$blog_dir/blog.conf'"
+fi
+
+if [ "$post_date" = "" ]; then
+  post_date=$1
+fi
+
+if [ "$post_source" = "" ]; then
+  post_source=$2
+fi
+
+if [ "$post_target" = "" ]; then
+  post_target=$3
+fi
+
+if [[ "$post_target" = "" || "$post_source" = "" ]]; then
+  echo "Usage: build_post [posted_date (YYYYMMDD)] [post source] [post target]" >&2
+  exit 1
+fi
+
+if [ "$lib_dir" = "" ]; then
+  if [ -e "$HOME/.config/shblog.conf" ]; then
+    . "$HOME/.config/shblog.conf"
+  else
+    . "/etc/shblog.conf"
+  fi
+
+  if ! [ -e "$lib_dir" ]; then
+    error "'$lib_dir' not found, please check shblog.conf lib_dir setting"
+  fi
+fi
+
+if ! [ -e "$post_source" ]; then
+  error "Unable to find '$post_source'"
+fi
+post_year="${post_date:0:4}"
+post_month="${post_date:4:2}"
+post_day="${post_date:6:2}"
+
+# Parse header and body
+in_header=true
+while read line; do
+  if [ "$line" = "" ]; then
+    in_header=false
+  fi
+
+  if $in_header; then
+    if [ "$headers" = "" ]; then
+      headers="$line"
+    else
+      headers="$headers
+$line"
+    fi
+  else
+    if [ "$body" = "" ]; then
+      body="$line"
+    else
+      body="$body
+$line"
+    fi
+  fi
+done < "$post_source"
+
+# Parse the headers and check correct
+while read line; do
+  key="${line%%:*}"
+  value="${line##*: }"
+  case $key in
+    'Title')
+      title="$value"
+      ;;
+    'Description')
+      description="$value"
+      ;;
+    'Thumbnail')
+      thumbnail="$value"
+      ;;
+    'Tag')
+      slug="${value,,}"
+      tags="$tags<a href=\"/tag/${slug// /-}\">$value</a>, "
+      ;;
+    '')
+      break;
+      ;;
+    *) ;;
+  esac 
+
+done < <(echo "$headers")
+
+if [ "$title" = "" ]; then
+    error "'$post_source' is missing Title header"
+fi
+
+if [ "$description" = "" ]; then
+    error "'$post_source' is missing Description header"
+fi
+
+if [ "$body" = "" ]; then
+    error "'$post_source' is missing content"
+fi
+
+post_file_name="${post_source##*/}"
+post_url="/$post_year/$post_month/$post_day/${post_file_name##*_}$html_extension"
+
+# Generate html
+{
+  while read line; do
+    case $line in
+      '##title##')
+        echo "<title>$blog_title_prefix$title$blog_title_suffix</title>"
+        ;;
+      '##description##')
+        echo "<meta name=\"description\" content=\"$description\" />"
+        ;;
+      '##base_url##')
+         echo "<base href=\"$blog_base_url\" />"
+         ;;
+      '##canonical##')
+        echo "<link rel=\"canonical\" href=\"$blog_base_url$post_url\" />"
+        ;;
+      *)
+        echo "$line"
+        ;;
+    esac
+  done < "$blog_dir/html_parts/header.html"
+  echo '<div id="wrapper">
+<div id="content">
+<div id="post_content">'
+  if [ "$thumbnail" != "" ]; then
+    if [ "$thumbnail_width" != "" ]; then
+      img_width=" width=\"$thumbnail_width\""
+    fi
+    if [ "$thumbnail_height" != "" ]; then
+      img_height=" height=\"$thumbnail_height\""
+    fi
+    echo "<img id=\"content_thumbnail\" src=\"$thumbnail\" alt=\"thumbnail\"$img_width$img_height />"
+  fi
+  echo "<h1 id=\"content_title\">$title</h1>"
+  echo "<div id=\"content_date\">$post_year-$post_month-$post_day</div>"
+  echo "$body" | "$lib_dir/pextile-filter"
+  echo '</div><!-- /post_content -->'
+  if ! [ "$categories" = "" ]; then
+    echo "<div id=\"categories\">Category: ${categories%, }</div>"
+  fi
+  if ! [ "$tags" = "" ]; then
+    echo '<div id="tags">Tagged '${tags%, }'</div>'
+  fi
+  cat "$blog_dir/html_parts/post_social.html"
+  echo '</div><!-- /content -->'
+  echo '</div><!-- /wrapper -->'
+  cat "$blog_dir/html_parts/footer.html"
+} > "$post_target" || error "Failed to create '$post_target'"

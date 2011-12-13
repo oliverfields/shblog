@@ -1,0 +1,71 @@
+#!/bin/bash
+# Generate static page listing blog posts in category or tag
+
+if ! [ -e "$blog_dir/post_source" ]; then
+  error "Directory '$blog_dir/post_source' not found"
+fi
+
+case $1 in
+  categories)
+    header_name='Category: '
+    url_segment='category'
+    ;;
+  tags)
+    header_name='Tag: '
+    url_segment='tag'
+    ;;
+  *)
+    error "Unknown type '$1'"
+    ;;
+esac
+
+OLD_IFS=$IFS
+IFS=$'\n'
+# Create list page for each found list (category or tag)
+for list in $(grep -h "^$header_name" "$blog_dir/post_source/"* | sort -u); do
+  # Strip prefrix
+  list_name="${list#$header_name}"
+  list_url="$url_segment/${list_name// /-}"
+  list_url="${list_url,,}"
+  list_dir="$blog_dir/site/$url_segment"
+  list_file="$blog_dir/site/$list_url$html_extension"
+
+  if ! [ -e "$list_dir" ]; then
+    mkdir -p "$list_dir"
+  fi
+
+  {
+    while read line; do
+      case $line in
+        '##title##')
+          echo "<title>$blog_title_prefix$list_name$blog_title_suffix</title>"
+          ;;
+        '##description##')
+          ;;
+        '##base_url##')
+           echo "<base href=\"$blog_base_url\" />"
+           ;;
+        '##canonical##')
+          echo "<link rel=\"canonical\" href=\"$blog_base_url/$list_url$html_extension\" />"
+          ;;
+        *)
+          echo "$line"
+          ;;
+      esac
+    done < "$blog_dir/html_parts/header.html"
+    echo '<div id="wrapper">
+<div id="post_list">'
+ 
+    echo "<h1>$list_name</h1>"
+
+    # List each post that contains the current category or tag
+    for post_file in $(grep --files-with-matches "^$list$" "$blog_dir/post_source/"* | sort -r); do
+      . "$lib_dir/post_list_view" "$post_file"
+    done
+
+    echo '</div><!-- /post_list -->
+</div><!-- /wrapper -->'
+    cat "$blog_dir/html_parts/footer.html"
+  } > "$list_file"
+done
+IFS=$OLD_IFS

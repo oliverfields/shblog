@@ -1,0 +1,39 @@
+#!/bin/bash
+
+post_source_dir="$blog_dir/post_source"
+site_dir="$blog_dir/site"
+
+if ! [ -e "$post_source_dir" ]; then
+  error "Unable to find '$post_source_dir'"
+fi
+
+if ! [ -e "$site_dir" ]; then
+  error "Unable to find '$site_dir'"
+fi
+
+for post_source in $(ls -1 "$post_source_dir/"* | sed "s#^$post_source_dir/##"); do
+  if [[ $post_source =~ ^[0-9]{8}_[a-z0-9-]*$ ]]; then
+    # Rip apart to determine archive directories
+    post_year="${post_source:0:4}"
+    post_month="${post_source:4:2}"
+    post_day="${post_source:6:2}"
+    post_url="${post_source:9}"
+    target_dir="$site_dir/$post_year/$post_month/$post_day"
+
+    post_target="$target_dir/$post_url$html_extension"
+    post_source="$post_source_dir/$post_source"
+    post_date="$post_year$post_month$post_day"
+
+    if [ -e "$post_target" ]; then
+      # Update if source newer than target
+      if [ "$post_source" -nt "$post_target" ]; then
+        mkdir -p "$target_dir" || error "Unable to create '$target_dir'"
+      fi
+    else
+      mkdir -p "$target_dir" || error "Unable to create '$target_dir'"
+      "$lib_dir/build_post" "$post_date" "$post_source" "$post_target"
+    fi
+  else
+    warning "Post '$post_source' name is not legal, must match 'YYYYMMDD_[a-z0-9-]*\$', skipping post"
+  fi
+done

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Setup new folder structure for blog
+
+if [ -e "$blog_dir" ]; then
+  error "Directory '$blog_dir' already exists, quitting"
+fi
+
+if [ -e "$skel_dir" ]; then
+  cp -R "$skel_dir" "$blog_dir" || error "Unable to copy '$skel_dir' to '$blog_dir'"
+else
+  error "Unable to find '$skel_dir', check skel_dir setting in shblog.conf"
+fi

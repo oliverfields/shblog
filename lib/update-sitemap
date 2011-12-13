@@ -1,0 +1,28 @@
+#!/bin/bash
+
+if ! [ -e "$blog_dir/post_source" ]; then
+  error "Directory '$blog_dir/post_source' not found"
+fi
+
+{
+  echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+  for post_file in $(ls -r "$blog_dir/post_source/"*); do
+    post_file_name="${post_file##*/}"
+
+    post_date="${post_file_name%%_*}"
+    post_year="${post_date:0:4}"
+    post_month="${post_date:4:2}"
+    post_day="${post_date:6:2}"
+    post_pretty_date="${post_year}-${post_month}-$post_day"
+
+    post_slug="${post_file_name##*_}"
+    post_url="/$post_year/$post_month/$post_day/$post_slug"
+
+    echo "<url>
+<loc>$blog_base_url$post_url</loc>
+<changefreq>weekly</changefreq> 
+<priority>0.5</priority>
+</url>"
+  done
+  echo '</urlset>'
+} > "$blog_dir/site/sitemap.xml"

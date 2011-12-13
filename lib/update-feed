@@ -1,0 +1,48 @@
+#!/bin/bash
+
+if ! [ -e "$blog_dir/post_source" ]; then
+  error "Directory '$blog_dir/post_source' not found"
+fi
+
+if [ "$max_feed_items" = "" ]; then
+  max_feed_items=9
+fi
+
+{
+  echo '<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<channel>'
+  echo "<title>$blog_title</title>
+<link>$blog_base_url/feed.xml</link>
+<description>$blog_description</description>
+<atom:link href=\"$blog_base_url/feed.xml\" rel=\"self\" type=\"application/rss+xml\" />"
+  for post_file in $(ls -r "$blog_dir/post_source/"* | head -$max_feed_items); do
+    post_file_name="${post_file##*/}"
+
+    post_title="$(grep -i '^Title:\ ' "$post_file" | sed 's/^\ *// ; s/\ *$//')"    
+    post_title="${post_title#*Title: }"
+
+    post_description="$(grep -i '^Description:\ ' "$post_file" | sed 's/^\ *// ; s/\ *$//')"
+    post_description="${post_description#Description: }"
+
+    post_date="${post_file_name%%_*}"
+    post_year="${post_date:0:4}"
+    post_month="${post_date:4:2}"
+    post_day="${post_date:6:2}"
+    post_pretty_date="${post_year}-${post_month}-$post_day"
+    pubDate="$(date --utc --date "${post_year}-${post_month}-${post_day}" '+%a, %d %b %Y 12:00:00 +0000')"
+
+    post_slug="${post_file_name##*_}"
+    post_url="/$post_year/$post_month/$post_day/$post_slug$html_extension"
+
+    echo "<item>
+<link>$blog_base_url$post_url</link>
+<guid isPermaLink=\"true\">$blog_base_url$post_url</guid>
+<title>$post_title</title>
+<pubDate>$pubDate</pubDate>
+<description>$post_description</description>
+</item>"
+  done
+  echo '</channel>
+</rss>'
+} > "$blog_dir/site/rss.xml"

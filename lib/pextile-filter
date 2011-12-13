@@ -1,0 +1,324 @@
+#!/bin/bash
+
+#------------------------------------------------------------
+# Pagegen - static HTML site generator
+# Copyright (C) 2009  Oliver Fields, oliver@phnd.net
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#------------------------------------------------------------
+
+# Convert files markedup with subset of textile markup to html for use by ssb.
+
+# Parse single line and apply markup
+function parseline {
+  line=$1
+
+  # Convert ' -> ', ' <- ', ' -- ', ' - ', ' x ' and '... ' to html entities
+  line=$(echo "$line" | sed 's/\ x\ /\ \&#215;\ /g;s/\ ->\ /\ \&#8594;\ /g;s/\ <-\ /\ \&#8592;\ /g;s/\ --\ /\ \&#8212;\ /g;s/\ -\ /\ \&#8211;\ /g;s/\.\.\./\&#8230;/g')
+
+  # __Emphasise__
+  #doc:Emphasise (italics): __text__ -> <em>text</em>
+  line=$(echo "$line" | sed 's#__\([^_]*\)__#<em>\1</em>#g')
+  
+  # **Strong**
+  #doc:Strong (bold): **text** -> <strong>text</strong>
+  # If not in list make bold even if ^**text**
+  if [ "$inlist" = "1" ]; then
+    line=$(echo "$line" | sed 's#\([^^]\)\*\*\([^\*]*\)\*\*#\1<strong>\2</strong>#g')
+  else
+    line=$(echo "$line" | sed 's#\*\*\([^\*]*\)\*\*#<strong>\1</strong>#g')
+  fi
+  
+  # --Strikethroug--
+  #doc:Strikethrough: --text-- -> <del>text</del>
+  line=$(echo "$line" | sed 's#--\([^-]*\)--#<del>\1</del>#g')
+  
+  # @@monospaced@@
+  #doc:Monospace: @@text@@ -> <tt>text</tt>
+  line=$(echo "$line" | sed 's#@@\([^@]*\)@@#<tt>\1</tt>#g')
+  
+  # [[footnote]]
+  #doc:Footnote reference (X = number): [[X]] -> <a class="pg_footnote_reference" href="#fnX">X</a>
+  line=$(echo "$line" | sed 's%\[\[\([^\]]*\)\]\]%<a\ class="pg_footnote_reference" href="#fn\1">\1</a>%g')
+  
+  # ABC(Acronym) 
+  #doc:Acronym: AGA((A good acronym)) -> <acronym title="A good acronym">AGA</acronym>
+  line=$(echo "$line" | sed 's#\([A-Z]*\)((\([^]]*\)))#<acronym\ title="\2">\1</acronym>#g')
+  
+  # !image url!, if !<, !> of !- left, right or center align the image
+  #doc:Image (after first exclamation can use <, > or - to align): !img_src Image alternative text! -> <img src="img_src" alt="Image alternative text"/>
+  if [[ "$line" =~ '!<' ]]; then
+    line=$(echo "$line" | sed 's#\!<\(\S*\)\ \([^!]*\)!#<img\ class="pg_img_left"\ alt=\"\2\"\ src=\"\1\"/>#g')
+  elif [[ "$line" =~ '!>' ]]; then
+    line=$(echo "$line" | sed 's#\!>\(\S*\)\ \([^!]*\)!#<img\ class="pg_img_right"\ alt=\"\2\"\ src=\"\1\"/>#g')
+  elif [[ "$line" =~ '!-' ]]; then
+    line=$(echo "$line" | sed 's#\!-\(\S*\)\ \([^!]*\)!#<img\ class="pg_img_center"\ alt=\"\2\"\ src=\"\1\"/>#g')
+  else
+    line=$(echo "$line" | sed 's#\!\(\S*\)\ \([^!]*\)!#<img\ alt=\"\2\"\ src=\"\1\"/>#g')
+  fi
+  
+  # "Link text":"name:link name" 
+  # Must be before regular links, else they will replace this as a normal link
+  #doc:Link (anchor point on same page): "The apple section":"name:apples" -> <a name="apples">The apple section</a>
+  line=$(echo "$line" | sed 's#"\([^"]*\)":"name:\([^"]*\)"#<a\ name="\2">\1</a>#g')
+
+  # "Link text":"URL" 
+  #doc:Link (normal): "This is a link":"http://phnd.net" -> <a href="http://phnd.net">This is a link</a>
+  #echo "$line" | sed 's#"\([^"]*\)":\(\S*\)#<a\ href="\2">\1</a>#g;s#</a> \([,\.)]\)#</a>\1#g'
+
+  if [ "$pextile_print_urls" = "1" ]; then 
+    line=$(echo "$line" | sed 's#"\([^"]*\)":"\([^"]*\)"#<a\ href="\2">\1</a><span\ class="pg_print_url">\ \2</span>#g' | sed "s#pg_print_url\">\ /#pg_print_url\">\ $site_base_url/#g")
+  else
+    line=$(echo "$line" | sed 's#"\([^"]*\)":"\([^"]*\)"#<a\ href="\2">\1</a>#g')
+  fi
+
+  echo "$line"
+}
+
+# In: level_diff
+# In: listtag
+# In: open_li_tags
+function close_list_tags {
+  local level_diff=$1
+  local listtag=$2
+  local open_li_tags=$3
+
+  # If previous lists are opend, close the list items and list
+  #echo level_diff $level_diff 
+  if [ $level_diff -le -1 ]; then
+    n=$level_diff
+    if [ $n -eq -1 ]; then
+      echo "</li>"
+      echo "</$listtag>"
+      echo "</li>"
+    else
+      echo "</li>" 
+      while [ $n -ne -1 ]; do
+        n=$(expr $n + 1)
+        echo "</$listtag>"
+        echo "</li>"
+      done
+      echo "</$listtag>"
+      echo "</li>" 
+    fi
+  fi
+      
+  # If only list item is open
+  if [ $open_li_tags -gt 0 ]; then
+    if [ $level_diff -eq 0 ]; then
+      echo "</li>"
+    fi
+  fi
+}
+
+inlist=0
+last_list_level=1
+intable=0
+inpre=0
+inescape=0
+
+while read line; do
+  # Determine if a line contains markup and if so return the element type
+  prefix=$(echo "$line" | sed 's%^\(h[1-6]\|>\|#*\|\**\|//\||[<>]*\|quote\|notice\|warning\|\%\|\%[<>]*\|/\*\|\*/\|fn[0-9]*\||-\|\%-\)\s.*%\1%')
+
+  # If empty line, just print it
+  if [ "$line" = "" ]; then
+    echo ""
+  fi
+
+  # Good for debug
+  #echo "--------"
+  #echo "line: .$line."
+  #echo "prefix: .$prefix."
+
+  # Start escape filter handling
+  if [ "$prefix" = '/*' ]; then
+    if [ "$inescape" = "0" ]; then
+      inescape=1
+      continue
+    fi
+  fi
+
+  if [ "$prefix" = '*/' ]; then
+    if [ "$inescape" = "1" ]; then
+      inescape=0
+      continue
+    fi
+  fi
+  # End escape filter handling
+
+  if [ "$inescape" = "1" ]; then
+    echo "$line"
+  else
+    # Start list handling
+    #doc:Numbered list: ^# Numberd list item$ (nest lists by prefixing additional '#' (hash)) -> <ol><li>Numbred list item</li></ol>
+    #doc:Unordered list (nest lists by prefixing additional '*' (asterix)): ^* Unordered list item$ -> <ul><li>Unordered list item</li></ul>
+
+    # List must start on level one, if a line starts with
+    # e.g. **strong text** is not a list, so set vars
+    # so no list action happens, else continue with list work
+    if [[ "$prefix" =~ ^\*\* ]] && [ "$inlist" = "0" ]; then
+      parseline "$(echo "$line")" | sed 's/.*/<p>&<\/p>/'  
+      continue
+    fi
+ 
+    if [[ "$prefix" =~ ^\*\**$ ]]; then
+      listtag="ul"
+    elif [[ "$prefix" =~ ^##*$ ]]; then
+      listtag="ol"
+    else
+      # If not a list item close and tidy up vars
+      if [ "$inlist" = "1" ]; then
+        level_diff=$(expr 1 - "$last_list_level")
+        if [ "$open_li_tags" -gt 3 ]; then
+          open_li_tags=$(expr $open_li_tags - 2)
+        fi
+        
+        #echo "close_list_tags \"$level_diff\" \"$listtag\" \"$open_li_tags\""
+        close_list_tags "$level_diff" "$listtag" "$open_li_tags"
+        echo "</$listtag>"
+        inlist=0
+        listtag=""
+      fi
+    fi
+    
+    if ! [ "$listtag" = "" ]; then
+      level_diff=$(expr "${#prefix}" - "$last_list_level")
+      
+      if [ "$inlist" = "0" ]; then
+        echo "<$listtag>"
+        inlist=1
+        open_li_tags=0
+      else
+        close_list_tags "$level_diff" "$listtag" "$open_li_tags"
+      fi
+
+      last_list_level=${#prefix}
+
+      if [ $level_diff -eq 1 ]; then
+        echo "<$listtag>"
+      fi
+      open_li_tags=$(expr $open_li_tags + 1)
+      echo "<li>"
+      echo "$(parseline "$line" | sed 's/^[^\ ]*\ //')"
+    fi  
+    # End list handling
+    
+    # Start table handling
+    #doc:Table row (use |<, |> or |- to align cell content): ^| Cell1 |> Cell2 |$ -> <table><tr><td>Cell1</td><td class="pg_td_right">Cell2</td></tr></table>
+    if [ "$prefix" = "|" ] || [ "$prefix" = "|<" ] || [ "$prefix" = "|>" ] || [ "$prefix" = "|-" ]; then
+      if [ "$intable" = "0" ]; then
+        echo "<table>"
+        intable=1
+      fi
+      echo "$(parseline "$line")" | sed 's/\s*|\s*/|/g;s/|/<\/td><td>/g;s/^<\/td>/<tr>/;s/<td>$/<\/tr>/;s/<td>> /<td\ class="pg_td_right">/g;s/<td><\ /<td\ class="pg_td_left">/g;s/<td>-\ /<td\ class="pg_td_center">/g'
+    #doc:Table header row (use %<, %> or %- to align cell content): ^%< Cell1 % Cell2 %$ -> <table><tr><th class="pg_th_left">Cell1</th><th>Cell2</th></tr></table>
+    elif [ "$prefix" = '%' ] || [ "$prefix" = '%>' ] || [ "$prefix" = '%<' ]|| [ "$prefix" = '%-' ]; then
+      if [ "$intable" = "0" ]; then
+        echo "<table>"
+        intable=1
+      fi
+      echo "$(parseline "$line")" | sed 's/\s*%\s*/%/g;s/%/<\/th><th>/g;s/^<\/th>/<tr>/;s/<th>$/<\/tr>/;s/<th>> /<th\ class="pg_th_right">/g;s/<th><\ /<th\ class="pg_th_left">/g;s/<th>- /<th\ class="pg_th_center">/g'
+    else
+      if [ "$intable" = "1" ]; then
+        echo "</table>"
+        intable=0
+      fi
+    fi
+    # End table handling
+    
+    # Start pre handling
+    #doc:Preformatted text: ^> Text$ -> <pre>Text</pre>
+    if [ "$prefix" = ">" ]; then
+      if [ "$inpre" = "0" ]; then
+        echo "<pre>"
+        inpre=1
+      fi
+      # Only chop off prefix, don't format anything
+      echo "$line" | cut -c 2-
+    else
+      if [ "$inpre" = "1" ]; then
+        echo "</pre>"
+        inpre=0
+      fi
+    fi
+    # End pre handling
+
+    # Start h1-4, p and slide seperator handling
+    case "$prefix" in
+      # Don't do anything for these lines
+      "#" | "##" | "###" | "####" | "#####" | "######" | "*" | "**" | "***" | "****" | "*****" | "******" | "//" | "|" | "|>" | "|<" | "%" | "%>" | "%<" | ">" )
+      ;;
+      #doc:Heading (h1-6): ^h1 Text$ -> <h1>Text</h1>
+      # Also check for anchor name in heading tags ("xxx":"name:dddd")
+      "h1" | "h2" | "h3" | "h4" | "h5" | "h6" )
+        echo "$line" | sed 's/^h\([1-6]\)\s\(.*\)/<h\1>\2<\/h\1>/;s#"\([^"]*\)":"name:\([^"]*\)"#<a\ name="\2">\1</a>#g'
+      ;;
+      #doc:Quote: ^quote Text$ -> <p class="pg_quote">Text</p>
+      "quote" )
+        parseline "$(echo "$line")" | sed 's/^quote\s\(.*\)/<p\ class="pg_quote">\1<\/p>/'
+      ;;
+      #doc:Notice: ^notice Text$ -> <p class="pg_notice">Text</p>
+      "notice" )
+        parseline "$(echo "$line")" | sed 's/^notice\s\(.*\)/<p\ class="pg_notice">\1<\/p>/'
+      ;;
+      #doc:Warning: ^warning Text$ -> <p class="pg_warning">Text</p>
+      "warning" )
+        parseline "$(echo "$line")" | sed 's/^warning\s\(.*\)/<p\ class="pg_warning">\1<\/p>/'
+      ;;
+      * )
+        if [ "$line" != "" ]; then
+          #doc:Horizontal rule: ^---$ -> <hr />
+          if [ "$line" = "---" ]; then
+            echo "<hr />"
+          else
+            # Footnote
+            #doc:Footnote (X = number): ^fnX Text$ -> <p class="pg_footnote"><a name="fnX">X.</a> Text</p>
+            if [[ "$prefix" =~ ^fn[0-9]* ]]; then
+              echo "$line" | sed 's#^fn\([0-9]*\)\ \(.*\)#<p\ class="pg_footnote"><a name="fn\1"\>\1.</a>\ \2</p>#'
+            # If image on own line, just print it (do not add p tags)
+            elif [[ "$prefix" =~ ^![^\ ]*\ [^!]*! ]]; then
+              parseline "$(echo "$line")"
+            # If line contains HTML tags do not process
+            # Paragraph
+            # Paragraph: ^Text$ -> <p>Text</p>
+            elif $(echo "$line" | grep -vq '<[^>]*[^/]*>'); then
+              parseline "$(echo "$line")" | sed 's/.*/<p>&<\/p>/'  
+            else
+              echo "$line"
+            fi
+          fi 
+        fi
+      ;;
+    esac
+  fi # If inescape
+done
+
+# If last line was a list item then close list
+if [ "$inlist" = "1" ]; then
+  level_diff=$(expr 1 - "$last_list_level")
+  #echo "close_list_tags \"$level_diff\" \"$listtag\" \"$open_li_tags\""
+  close_list_tags "$level_diff" "$listtag" "$open_li_tags"
+  echo "</$listtag>"
+fi
+
+# If last line was table row, close table
+if [ "$intable" = "1" ]; then
+  echo "</table>"
+fi
+
+# If last line was preformatted text, close pre tag
+if [ "$inpre" = "1" ]; then
+  echo "</pre>"
+fi

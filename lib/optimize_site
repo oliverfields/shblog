@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# Optimize shblog site directory
+# - Tidy and minify html
+# -Combine js into one file and minify
+# -Combine css into one file and minify
+# - Optimize png and jpg files
+
+image_target_dir="$site_dir/images"
+graphics_target_dir="$site_dir/graphics"
+
+css_source_dir="$blog_dir/includes/css"
+css_target_dir="$site_dir/css"
+css_combined_file="$css_target_dir/style.css"
+temp_css="$(mktemp /tmp/XXXXXXXXXX.css)"
+
+js_source_dir="$blog_dir/includes/javascript"
+js_target_dir="$site_dir/javascript"
+js_combined_file="$site_dir/javascript/script.js"
+temp_js="$(mktemp /tmp/XXXXXXXXXX.js)"
+
+# Lossless compression of all png and jpg images
+optipng -quiet "$image_target_dir/"*.png
+optipng -quiet "$graphics_target_dir/"*.png
+jpegoptim --quiet "$image_target_dir/"*.jpg
+jpegoptim --quiet "$image_graphics_dir/"*.jpg
+
+## Merge css_dir/* files into one, tidy and then minify
+if [ -e "$css_combined_file" ]; then
+  rm "$css_combined_file"
+fi
+
+for css_file in "$css_source_dir/"*.css; do
+  cat "$css_file" >> "$temp_css"
+done
+
+csstidy "$temp_css" --silent=true | yui-compressor --type css "/dev/stdin" > "$css_combined_file"
+rm "$temp_css"
+
+## Merge js_dir/* files into one then minify
+if [ -e "$js_combined_file" ]; then
+  rm "$js_combined_file"
+fi
+
+for js_file in "$js_source_dir/"*.js; do
+  cat "$js_file" >> "$temp_js"
+done
+
+yui-compressor --type js "$temp_js" > "$js_combined_file"
+rm "$temp_js"
+
+
+# HTML tidy
+# Remove include html files and copy from source before minifying
+#    if [ $(ls -1A "$html_includes_dir/" | wc -l) -gt 0 ]; then
+#      rm "$html_includes_dir/"*
+#    fi
+#    cp -f "$html_includes_source_dir/"* "$html_includes_dir/."
+
+# Find all generated html and compress
+#find "$site_dir" -name '*.html' -o -name '*.shtml' | while read file; do
+find "$site_dir" -type f | while read file; do
+  if [[ "$(file -b "$file")" =~ ^HTML ]]; then
+    java -jar "$blog_dir/script/htmlcompressor-1.4.jar" --preserve-comments "$file" -o "$file"
+    sed -i 's/<!--\ [^-]*-->//g' "$file"
+  fi
+done

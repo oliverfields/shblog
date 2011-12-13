@@ -1,0 +1,116 @@
+#!/bin/bash -
+
+# shblog - static site blog generator
+# Author: Oliver Fields, oliver@phnd.net
+
+# Set to known values
+IFS=$' \t\n'
+PATH=/bin:/usr/bin
+
+# Exit on error
+set -e
+
+function error {
+  echo "Error: $1" >&2
+  exit 1
+}
+
+function warning {
+  echo "Warning: $1" >&2
+}
+
+function usage {
+  echo "Usage: $(basename $0) [init [blog dir]|update [blog dir]|update-sitemap [blog dir]|update-feed [blog dir]|rebuild]" >&2
+  exit 1
+}
+
+function update_blog {
+  . "$lib_dir/build_posts"
+  . "$lib_dir/update-frontpage"
+  . "$lib_dir/update-list-pages" categories
+  . "$lib_dir/update-list-pages" tags
+  . "$lib_dir/update-frontpage"
+  . "$lib_dir/update-sitemap"
+  . "$lib_dir/update-feed"
+  cp -R "$blog_dir/includes/"* "$blog_dir/site/."
+
+  if [ "$optimize_site" = "1" ]; then
+    . "$lib_dir/optimize_site"
+  fi
+}
+
+function load_blog_config() {
+  if [ -e "$blog_dir/blog.conf" ]; then
+    . "$blog_dir/blog.conf"
+  else
+    error "Unable to load '$blog_dir/blog.conf'"
+  fi
+}
+
+# Load config
+if [ -e "./shblog.conf" ]; then
+  . "./shblog.conf"
+elif [ -e "$HOME/.config/shblog.conf" ]; then
+  . "$HOME/.config/shblog.conf"
+elif [ -e "/etc/shblog.conf" ]; then
+  . "/etc/shblog.conf"
+else
+  error "Unable to load either './shblog.conf', '$HOME/.config/shblog.conf' or '/etc/shblog.conf'"
+fi
+
+# Trim any trailing slashes
+lib_dir="${lib_dir%/}"
+skel_dir="${skel_dir%/}"
+
+if ! [ -e "$lib_dir" ]; then
+  error "Unable to load dependencies from '$lib_dir', check 'lib_dir' setting in shblog.conf"
+fi
+
+export blog_dir="${2%/}" # Trim any trailing slash                              
+
+if [ "$blog_dir" = "" ]; then
+  usage
+fi
+
+# Check valid action, then shift arguments to chop off action
+cmd="$lib_dir/$1"
+case $1 in
+  update)
+    load_blog_config
+    update_blog
+  ;;
+  rebuild)
+    load_blog_config
+    # Remove already buily posts, will then rebuild them as default behaviour
+    rm -Rf $blog_dir/site/20* || error "Unable to remove '$blog_dir/site/20*'"
+    update_blog
+  ;;
+  init)
+    . "$lib_dir/init"
+  ;;
+  update-sitemap|update-feed)
+    if ! [ -e "$blog_dir" ]; then
+      error "Directory '$blog_dir' not found"
+    fi
+
+    load_blog_config
+
+    # Source the relevant script to preserve environment
+    if [ -e "$cmd" ]; then
+      . "$cmd"
+    else
+      error "Unable to run '$cmd'"
+    fi
+  ;;
+  update-categories)
+    load_blog_config
+    . "$lib_dir/update-list-pages" categories
+  ;;
+  update-tags)
+    load_blog_config
+    . "$lib_dir/update-list-pages" tags
+  ;;
+  *)
+    usage
+  ;;
+esac
