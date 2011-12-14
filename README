@@ -1,0 +1,51 @@
+shblog - static blogging from command line
+
+Oliver Fields <oliver@phnd.net>
+
+Licence: GPLv3
+
+
+Static blog generator written in bash. Static site generation because:
+- Security
+- Version controllable text
+- Speed
+- Use vi:)
+
+
+Setup:
+------
+1. Clone repo to home dir, change if want somewhere else:
+     $ git clone git@github.com:oliverfields/shblog.git ~/shblog
+
+2. Create config file:
+     $ cp ~/shblog/shblog.conf ~/.config/shblog.conf
+
+
+Getting started:
+----------------
+1. Change to home directory (cd ~)
+
+2. Initiate new blog, will create new directroy and populate it with required 
+   files (from '~/shblog/blog_skel'):
+     $ ~/shblog/shblog init myblog
+
+3. Style blog by editing any file in 'myblog/html_parts' ('post_social.html'
+   is appended after blog content on actual blog post page, useful for adding
+   various social stuff, e.g. Facebook like button and/or Disqus comments).
+   Create CSS files in '~/myblog/includes/css', on build they will be copied
+   to '~/myblog/site/css'. CSS files are not automatically added to HTML, so
+   must add regular HTML markup appropriate html part file, e.g.
+   'html_parts/header.html'. The 'includes/javascript' and 'includes/images'
+   are treated same way as CSS.
+
+4. New posts are created in '~/myblog/post_source'. The files must be prefixed
+   'YYYYMMDD_' and contain only lowercase letters, numbers or hyphens ('-').
+   Post files start with headers (key value pairs), followed by a empty line
+   and then content. Content is written in Pextile
+   (http://pagegen.phnd.net/user-manual/pextile-markup-reference).
+
+5. Build blog, 'update' will rebuild only pages that have
+   changes. Use 'rebuild' to force rebuild of everything.
+     $ ~/shblog/shblog update myblog
+
+6. Copy directory '~/myblog/site' to web server.

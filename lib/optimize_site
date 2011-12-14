@@ -2,12 +2,11 @@
 
 # Optimize shblog site directory
 # - Tidy and minify html
-# -Combine js into one file and minify
-# -Combine css into one file and minify
+# - Combine js into one file and minify
+# - Combine css into one file and minify
 # - Optimize png and jpg files
 
 image_target_dir="$site_dir/images"
-graphics_target_dir="$site_dir/graphics"
 
 css_source_dir="$blog_dir/includes/css"
 css_target_dir="$site_dir/css"
@@ -21,9 +20,7 @@ temp_js="$(mktemp /tmp/XXXXXXXXXX.js)"
 
 # Lossless compression of all png and jpg images
 optipng -quiet "$image_target_dir/"*.png
-optipng -quiet "$graphics_target_dir/"*.png
 jpegoptim --quiet "$image_target_dir/"*.jpg
-jpegoptim --quiet "$image_graphics_dir/"*.jpg
 
 ## Merge css_dir/* files into one, tidy and then minify
 if [ -e "$css_combined_file" ]; then
