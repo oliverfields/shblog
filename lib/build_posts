@@ -26,8 +26,8 @@ for post_source in $(ls -1 "$post_source_dir/"* | sed "s#^$post_source_dir/##");
 
     if [ -e "$post_target" ]; then
       # Update if source newer than target
-      if [ "$post_source" -nt "$post_target" ]; then
-        mkdir -p "$target_dir" || error "Unable to create '$target_dir'"
+      if [ $(date -r "$post_source" +%s) -gt $(date -r "$post_target" +%s) ]; then
+        "$lib_dir/build_post" "$post_date" "$post_source" "$post_target"
       fi
     else
       mkdir -p "$target_dir" || error "Unable to create '$target_dir'"

@@ -23,7 +23,7 @@ while read line; do
       post_thumbnail="$value"
       ;;
     'Tag')
-      slug="${value,,}"
+      slug="${value,,}$html_extension"
       tags="$tags<a href=\"/tag/${slug// /-}\">$value</a>, "
       ;;
     '')

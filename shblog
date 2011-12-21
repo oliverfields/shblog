@@ -81,7 +81,7 @@ case $1 in
   ;;
   rebuild)
     load_blog_config
-    # Remove already buily posts, will then rebuild them as default behaviour
+    # Remove already built posts, will then rebuild them as default behaviour
     rm -Rf $blog_dir/site/20* || error "Unable to remove '$blog_dir/site/20*'"
     update_blog
   ;;
