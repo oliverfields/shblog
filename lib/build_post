@@ -86,7 +86,7 @@ while read line; do
       thumbnail="$value"
       ;;
     'Tag')
-      slug="${value,,}$html_extentsion"
+      slug="${value,,}$html_extension"
       tags="$tags<a href=\"/tag/${slug// /-}\">$value</a>, "
       ;;
     '')

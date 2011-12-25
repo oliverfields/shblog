@@ -56,7 +56,7 @@ for list in $(grep -h "^$header_name" "$blog_dir/post_source/"* | sort -u); do
     echo '<div id="wrapper">
 <div id="post_list">'
  
-    echo "<h1>$list_name</h1>"
+    echo "<h1>Posts tagged $list_name</h1>"
 
     # List each post that contains the current category or tag
     for post_file in $(grep --files-with-matches "^$list$" "$blog_dir/post_source/"* | sort -r); do
