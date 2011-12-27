@@ -13,9 +13,9 @@ fi
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
 <channel>'
   echo "<title>$blog_title</title>
-<link>$blog_base_url/feed.xml</link>
+<link>$blog_base_url/rss.xml</link>
 <description>$blog_description</description>
-<atom:link href=\"$blog_base_url/feed.xml\" rel=\"self\" type=\"application/rss+xml\" />"
+<atom:link href=\"$blog_base_url/rss.xml\" rel=\"self\" type=\"application/rss+xml\" />"
   for post_file in $(ls -r "$blog_dir/post_source/"* | head -$max_feed_items); do
     post_file_name="${post_file##*/}"
 
