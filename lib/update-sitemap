@@ -19,7 +19,7 @@ fi
     post_url="/$post_year/$post_month/$post_day/$post_slug"
 
     echo "<url>
-<loc>$blog_base_url$post_url</loc>
+<loc>$blog_base_url$post_url$html_extension</loc>
 <changefreq>weekly</changefreq> 
 <priority>0.5</priority>
 </url>"
