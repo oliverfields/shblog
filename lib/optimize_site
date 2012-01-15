@@ -31,7 +31,14 @@ for css_file in "$css_source_dir/"*.css; do
   cat "$css_file" >> "$temp_css"
 done
 
-csstidy "$temp_css" --silent=true | yui-compressor --type css "/dev/stdin" > "$css_combined_file"
+#warning "csstidy bug mangles media queries, skipping css compress"
+#warning "http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=655984"
+#cp "$temp_css" "$css_combined_file"
+yui-compressor --type css "$temp_css" > "$css_combined_file"
+
+# Using cssoptimizer
+# http://mabblog.com/cssoptimizer/download.html
+#cssoptimizer "$temp_css" -o > "$css_combined_file"
 rm "$temp_css"
 
 ## Merge js_dir/* files into one then minify

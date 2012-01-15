@@ -12,6 +12,17 @@ fi
 while read line; do
   key="${line%%:*}"
   value="${line##*: }"
+
+  # Headers are over when hit first blank line
+  if [ "$line" = "" ]; then
+    break
+  fi
+
+  if [ "$key" = "$value" ]; then
+    warning "Header '$key' empty in '$post_file'"
+    continue
+  fi
+
   case $key in
     'Title')
       post_title="$value"
