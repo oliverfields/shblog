@@ -42,6 +42,7 @@ fi
     . "$lib_dir/post_list_view" "$post_file"
   done
   echo '</div><!-- /post_list -->'
+  echo "<div><a href=\"/archive$html_extension\">Older posts</a></div>"
   echo '</div><!-- /wrapper -->'
   cat "$blog_dir/html_parts/footer.html"
 } > "$blog_dir/site/index$html_extension"

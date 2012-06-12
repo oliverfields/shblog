@@ -20,7 +20,7 @@ function warning {
 }
 
 function usage {
-  echo "Usage: $(basename $0) [init [blog dir]|update [blog dir]|update-sitemap [blog dir]|update-feed [blog dir]|rebuild]" >&2
+  echo "Usage: $(basename $0) [init [blog dir]|update [blog dir]|update-sitemap [blog dir]|update-feed [blog dir]|update-archive [blog dir]|rebuild]" >&2
   exit 1
 }
 
@@ -32,6 +32,7 @@ function update_blog {
   . "$lib_dir/update-frontpage"
   . "$lib_dir/update-sitemap"
   . "$lib_dir/update-feed"
+  . "$lib_dir/update-archive-page"
   cp -R "$blog_dir/includes/"* "$blog_dir/site/."
 
   if [ "$optimize_site" = "1" ]; then
@@ -109,6 +110,10 @@ case $1 in
   update-tags)
     load_blog_config
     . "$lib_dir/update-list-pages" tags
+  ;;
+  update-archive)
+    load_blog_config
+    . "$lib_dir/update-archive-page"
   ;;
   *)
     usage

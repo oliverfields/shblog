@@ -1,0 +1,66 @@
+#!/bin/bash
+# Generate static listing all blog posts
+
+if ! [ -e "$blog_dir/post_source" ]; then
+  error "Directory '$blog_dir/post_source' not found"
+fi
+
+if [ "$max_frontpage_posts" = "" ]; then
+  max_frontpage_posts=7
+fi
+loop_count=0
+
+OLD_IFS=$IFS
+IFS=$'\n'
+{
+  # Build page html header
+  while read line; do
+    case $line in
+      '##title##')
+        echo "<title>${blog_title_prefix}Archive$blog_title_suffix</title>"
+        ;;
+      '##description##')
+        ;;
+      '##base_url##')
+         echo "<base href=\"$blog_base_url\" />"
+         ;;
+      '##canonical##')
+        echo "<link rel=\"canonical\" href=\"$blog_base_url/archive$html_extension\" />"
+        ;;
+      *)
+        echo "$line"
+        ;;
+    esac
+  done < "$blog_dir/html_parts/header.html"
+  echo '<div id="wrapper">
+  <div id="post_list">'
+   
+  echo "<h1>Archive</h1><table>"
+
+  # List each post
+  for post in $(grep --ignore-case "^Title: " "$blog_dir/post_source/"* | sort -r); do
+    if [ $loop_count -lt $max_frontpage_posts ]; then
+      let "loop_count=$loop_count+1"
+      continue
+    fi
+ 
+    file_name="${post%%:*}"
+    file_name="${file_name##*/}"
+    post_title="${post##*: }"
+    post_date="${file_name%%_*}"
+    post_year="${post_date:0:4}"
+    post_month="${post_date:4:2}"
+    post_day="${post_date:6:2}"
+    post_pretty_date="${post_year}-${post_month}-$post_day"
+    post_slug="${file_name##*_}"
+
+    post_url="/$post_year/$post_month/$post_day/$post_slug$html_extension" 
+
+    echo "<tr><td>$post_pretty_date</td><td><a href=\"$post_url\">$post_title</a></td></tr>"
+  done
+
+  echo '</table></div><!-- /post_list -->
+  </div><!-- /wrapper -->'
+  cat "$blog_dir/html_parts/footer.html"
+} > "$blog_dir/site/archive$html_extension"
+IFS=$OLD_IFS
