@@ -1,0 +1,108 @@
+#!/bin/bash
+# Generate static pages (including frontpage) listing blog posts
+
+function build_page {
+  file="$1"
+  file_list="$2"
+  page_file_name_counter=$3
+  position=$4
+  file_name="$blog_dir/site/$file"
+  older_link=$(($page_file_name_counter + 1))
+  newer_link=$(($page_file_name_counter - 1))
+  canonical_url="$blog_base_url/$file"
+
+  if [ $position = 'last' ]; then
+    older_link_tag=''
+  else
+    older_link_tag="<a class=\"older_posts\" href=\"/index$older_link${html_extension}\">Older posts</a>"
+  fi
+
+  if [ $position = 'first' ]; then
+    newer_link_tag=''
+  else
+    if [ $newer_link -eq 0 ]; then
+      newer_link_tag="<a class=\"newer_posts\" href=\"/index${html_extension}\">Newer posts</a>"
+    else
+      newer_link_tag="<a class=\"newer_posts\" href=\"/index$newer_link${html_extension}\">Newer posts</a>"
+    fi
+  fi
+
+	paging_html="<div id=\"paging\">$newer_link_tag$older_link_tag</div><!-- /paging -->"
+
+#  echo '-------------'
+#  echo "File name: $file_name"
+#	echo "Pos: $position"
+#	echo "Newer: $newer_link_tag"
+#	echo "Older: $older_link_tag"
+#  for i in ${file_list[@]}; do
+#    echo "Fl: $i"
+#  done
+#  file_list=()
+#  echo
+
+  {
+    while read line; do
+      case $line in
+        '##title##')
+          echo "<title>$blog_title_prefix$blog_title_suffix</title>"
+          ;;
+        '##description##')
+          ;;
+        '##base_url##')
+           echo "<base href=\"$blog_base_url\" />"
+           ;;
+        '##canonical##')
+          echo "<link rel=\"canonical\" href=\"$canonical_url\" />"
+          ;;
+        *)
+          echo "$line"
+          ;;
+      esac
+    done < "$blog_dir/html_parts/header.html"
+    echo '<div id="wrapper">
+<div id="post_list">'
+    echo $paging_html
+
+    for post_file in "${file_list[@]}"; do
+      . "$lib_dir/post_list_view" "$blog_dir/post_source/$post_file"
+    done
+
+    echo $paging_html
+    echo '</div><!-- /post_list -->
+</div><!-- /wrapper -->'
+    cat "$blog_dir/html_parts/footer.html"
+  } > "$file_name"
+}
+
+if ! [ -e "$blog_dir/post_source" ]; then
+  error "Directory '$blog_dir/post_source' not found"
+fi
+
+if [ "$posts_per_page" = "" ]; then
+  posts_per_page=9
+fi	
+
+OLD_IFS=$IFS
+IFS=$'\n'
+page_post_counter=0
+page_file_name_counter=0
+page_file_name="index${html_extension}"
+position='first'
+file_list=()
+pages_list=()
+for post in $(ls "$blog_dir/post_source"); do
+  if [ $page_post_counter -eq $posts_per_page ]; then
+    build_page "$page_file_name" "$file_list" "$page_file_name_counter" "$position"
+    file_list=()
+    page_post_counter=1
+    position='mid'
+    let "page_file_name_counter=page_file_name_counter + 1"
+    page_file_name="index${page_file_name_counter}${html_extension}"
+  else
+    let "page_post_counter=page_post_counter + 1"
+  fi
+  file_list[${#file_list[@]}]="$post"
+
+done
+build_page "$page_file_name" "$file_list" "$page_file_name_counter" 'last'
+IFS=$OLD_IFS

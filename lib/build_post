@@ -82,13 +82,6 @@ while read line; do
     'Description')
       description="$value"
       ;;
-    'Thumbnail')
-      thumbnail="$value"
-      ;;
-    'Tag')
-      slug="${value,,}$html_extension"
-      tags="$tags<a href=\"/tag/${slug// /-}\">$value</a>, "
-      ;;
     '')
       break;
       ;;
@@ -136,25 +129,10 @@ post_url="/$post_year/$post_month/$post_day/${post_file_name##*_}$html_extension
   echo '<div id="wrapper">
 <div id="content">
 <div id="post_content">'
-  if [ "$thumbnail" != "" ]; then
-    if [ "$thumbnail_width" != "" ]; then
-      img_width=" width=\"$thumbnail_width\""
-    fi
-    if [ "$thumbnail_height" != "" ]; then
-      img_height=" height=\"$thumbnail_height\""
-    fi
-    echo "<img id=\"content_thumbnail\" src=\"$thumbnail\" alt=\"thumbnail\"$img_width$img_height />"
-  fi
   echo "<h1 id=\"content_title\">$title</h1>"
   echo "<div id=\"content_date\">$post_year-$post_month-$post_day</div>"
   echo "$body" | "$lib_dir/pextile-filter"
   echo '</div><!-- /post_content -->'
-  if ! [ "$categories" = "" ]; then
-    echo "<div id=\"categories\">Category: ${categories%, }</div>"
-  fi
-  if ! [ "$tags" = "" ]; then
-    echo '<div id="tags">Tagged '${tags%, }'</div>'
-  fi
   cat "$blog_dir/html_parts/post_social.html"
   echo '</div><!-- /content -->'
   echo '</div><!-- /wrapper -->'

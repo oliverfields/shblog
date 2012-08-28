@@ -1,7 +1,6 @@
 #!/bin/bash
 
 post_file="$1"
-tags=''
 
 if ! [ -e "$post_file" ]; then
   echo "Unable to find '$post_file'" >&2
@@ -30,13 +29,6 @@ while read line; do
     'Description')
       post_description="$value"
       ;;
-    'Thumbnail')
-      post_thumbnail="$value"
-      ;;
-    'Tag')
-      slug="${value,,}$html_extension"
-      tags="$tags<a href=\"/tag/${slug// /-}\">$value</a>, "
-      ;;
     '')
       break;
       ;;
@@ -55,19 +47,8 @@ post_pretty_date="${post_year}-${post_month}-$post_day"
 post_slug="${post_file_name##*_}"
 post_url="/$post_year/$post_month/$post_day/$post_slug$html_extension"
 
-echo "<div class=\"post_list_view\">"
-if ! [ "$post_thumb" = "" ]; then
-  if [ "$thumbnail_width" != "" ]; then                                       
-    img_width=" width=\"$thumbnail_width\""
-  fi
-  if [ "$thumbnail_height" != "" ]; then
-    img_height=" height=\"$thumbnail_height\""
-  fi
-
-  echo "<a href=\"$post_url\"><img class=\"post_thumb\" src=\"$post_thumb\" alt=\"Thumbnail\"$img_height$img_width /></a>"
-fi
-echo "<h2 class=\"post_title\"><a href=\"$post_url\">$post_title</a></h2>
+echo "<div class=\"post_list_view\">
+<h2 class=\"post_title\"><a href=\"$post_url\">$post_title</a></h2>
 <div class=\"post_date\">$post_pretty_date</div>
 <p class=\"post_description\">$post_description</p>
-<div class=\"tags\">Tagged ${tags%, }</div>
 </div><!-- /post_list_view -->"
