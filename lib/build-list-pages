@@ -29,16 +29,14 @@ function build_page {
 
 	paging_html="<div id=\"paging\">$newer_link_tag$older_link_tag</div><!-- /paging -->"
 
-#  echo '-------------'
-#  echo "File name: $file_name"
-#	echo "Pos: $position"
-#	echo "Newer: $newer_link_tag"
-#	echo "Older: $older_link_tag"
-#  for i in ${file_list[@]}; do
-#    echo "Fl: $i"
-#  done
-#  file_list=()
-#  echo
+#echo '-------------'
+#echo "File name: $file_name"
+#echo "Pos: $position"
+#echo "Newer: $newer_link_tag"
+#echo "Older: $older_link_tag"
+#for i in ${file_list[@]}; do
+#  echo "Fl: $i"
+#done
 
   {
     while read line; do
