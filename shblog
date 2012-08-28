@@ -20,7 +20,7 @@ function warning {
 }
 
 function usage {
-  echo "Usage: $(basename $0) [init [blog dir]|build [blog dir]|]" >&2
+  echo "Usage: $(basename $0) <init | build | rebuild> [blog dir] | help" >&2
   exit 1
 }
 
@@ -44,6 +44,19 @@ function load_blog_config() {
   fi
 }
 
+function helpmsg() {
+  echo ' shblog - minimal static blog generator
+
+ General usage: shblog <mode> <blog directory>
+
+ Modes:
+  init <directory>	Creates new blog directory
+  build <directory>	Builds posts where post_source file is older than target
+  rebuild <directory>	Deletes all built posts then rebuilds them
+  help			This message'
+  exit 0
+}
+
 # Load global config
 if [ -e "./shblog.conf" ]; then
   . "./shblog.conf"
@@ -63,7 +76,11 @@ if ! [ -e "$lib_dir" ]; then
   error "Unable to load dependencies from '$lib_dir', check 'lib_dir' setting in shblog.conf"
 fi
 
-export blog_dir="${2%/}" # Trim any trailing slash                              
+export blog_dir="${2%/}" # Trim any trailing slash                            
+
+if [ "$1" = "help" ]; then
+  helpmsg
+fi
 
 if [ "$blog_dir" = "" ]; then
   usage
@@ -76,8 +93,17 @@ case $1 in
     load_blog_config
     build_blog
   ;;
+  rebuild)
+    load_blog_config
+    # Remove already built posts, will then rebuild them as default behaviour
+    rm -Rf $blog_dir/site/20* || error "Unable to remove '$blog_dir/site/20*'"
+    build_blog
+  ;;
   init)
     . "$lib_dir/init"
+  ;;
+  help)
+    helpmsg
   ;;
   *)
     usage

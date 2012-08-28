@@ -14,35 +14,27 @@ function build_page {
   if [ $position = 'last' ]; then
     older_link_tag=''
   else
-    older_link_tag="<a class=\"older_posts\" href=\"/index$older_link${html_extension}\">Older posts</a>"
+    older_link_tag="<a class=\"older_posts\" href=\"/index$older_link${html_extension}\">Older &rarr;</a>"
   fi
 
   if [ $position = 'first' ]; then
     newer_link_tag=''
   else
     if [ $newer_link -eq 0 ]; then
-      newer_link_tag="<a class=\"newer_posts\" href=\"/index${html_extension}\">Newer posts</a>"
+      newer_link_tag="<a class=\"newer_posts\" href=\"/index${html_extension}\">&larr; Newer</a>"
     else
-      newer_link_tag="<a class=\"newer_posts\" href=\"/index$newer_link${html_extension}\">Newer posts</a>"
+      newer_link_tag="<a class=\"newer_posts\" href=\"/index$newer_link${html_extension}\">&larr; Newer</a>"
     fi
   fi
 
-	paging_html="<div id=\"paging\">$newer_link_tag$older_link_tag</div><!-- /paging -->"
-
-#echo '-------------'
-#echo "File name: $file_name"
-#echo "Pos: $position"
-#echo "Newer: $newer_link_tag"
-#echo "Older: $older_link_tag"
-#for i in ${file_list[@]}; do
-#  echo "Fl: $i"
-#done
+	paging_top_html="<div id=\"paging_top\">$newer_link_tag$older_link_tag</div><!-- /paging -->"
+	paging_bottom_html="<div id=\"paging_bottom\">$newer_link_tag$older_link_tag</div><!-- /paging -->"
 
   {
     while read line; do
       case $line in
         '##title##')
-          echo "<title>$blog_title_prefix$blog_title_suffix</title>"
+          echo "<title>$blog_title_prefix$frontpage_title$blog_title_suffix</title>"
           ;;
         '##description##')
           ;;
@@ -59,13 +51,13 @@ function build_page {
     done < "$blog_dir/html_parts/header.html"
     echo '<div id="wrapper">
 <div id="post_list">'
-    echo $paging_html
+    echo $paging_top_html
 
     for post_file in "${file_list[@]}"; do
       . "$lib_dir/post_list_view" "$blog_dir/post_source/$post_file"
     done
 
-    echo $paging_html
+    echo $paging_bottom_html
     echo '</div><!-- /post_list -->
 </div><!-- /wrapper -->'
     cat "$blog_dir/html_parts/footer.html"
@@ -88,7 +80,7 @@ page_file_name="index${html_extension}"
 position='first'
 file_list=()
 pages_list=()
-for post in $(ls "$blog_dir/post_source"); do
+for post in $(ls -r "$blog_dir/post_source"); do
   if [ $page_post_counter -eq $posts_per_page ]; then
     build_page "$page_file_name" "$file_list" "$page_file_name_counter" "$position"
     file_list=()
