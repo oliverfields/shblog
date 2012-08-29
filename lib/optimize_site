@@ -1,58 +1,108 @@
 #!/bin/bash
 
-# Optimize shblog site directory
+# Optimize shblog site directory for any file that is older than source
+# or that does not exist
 # - Tidy and minify html
 # - Combine js into one file and minify
 # - Combine css into one file and minify
 # - Optimize png and jpg files
 
+function optimize_image() {
+  image_file=$1
+  image_ext="${image_file#*.}"
+
+  case "$image_ext" in
+    png)
+      if [ -x optipng ]; then
+        optipng -quiet "$image_file"
+      else
+        warning "Optimization: optipng not found, skipping"
+      fi
+    ;;
+    jpg|jpeg)
+      if [ -x jpegoptim ]; then
+        jpegoptim --quiet "$image_file"
+      else
+        warning "Optimization: jpegoptim not found, skipping"
+      fi
+    ;;
+  esac
+}
+
+site_dir="$blog_dir/site"
+
 image_target_dir="$site_dir/images"
+image_source_dir="$blog_dir/includes/images"
 
 css_source_dir="$blog_dir/includes/css"
 css_target_dir="$site_dir/css"
 css_combined_file="$css_target_dir/style.css"
-temp_css="$(mktemp /tmp/XXXXXXXXXX.css)"
 
 js_source_dir="$blog_dir/includes/javascript"
 js_target_dir="$site_dir/javascript"
 js_combined_file="$site_dir/javascript/script.js"
-temp_js="$(mktemp /tmp/XXXXXXXXXX.js)"
 
 # Lossless compression of all png and jpg images
-optipng -quiet "$image_target_dir/"*.png
-jpegoptim --quiet "$image_target_dir/"*.jpg
-
-## Merge css_dir/* files into one, tidy and then minify
-if [ -e "$css_combined_file" ]; then
-  rm "$css_combined_file"
-fi
-
-for css_file in "$css_source_dir/"*.css; do
-  cat "$css_file" >> "$temp_css"
+for source_file in $(ls "$image_source_dir/"*); do
+  target_file="$site_dir/images/$(basename "$source_file")"
+  if [ "$source_file" -nt "$target_file" ]; then
+    optimize_image "$target_file"
+  fi
 done
 
-#warning "csstidy bug mangles media queries, skipping css compress"
-#warning "http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=655984"
-#cp "$temp_css" "$css_combined_file"
-yui-compressor --type css "$temp_css" > "$css_combined_file"
+# Check if any CSS files are newer than target, if so optimize
+for css_file in "$(ls "$css_source_dir/"*.css)"; do
+  if [ ! -e "$css_combined_file" ] || [ "$css_file" -nt "$css_combined_file" ] ; then
+    ## Merge css_dir/* files into one, tidy and then minify
+    if [ -e "$css_combinded_file" ]; then
+      rm "$css_combined_file"
+    fi
 
-# Using cssoptimizer
-# http://mabblog.com/cssoptimizer/download.html
-#cssoptimizer "$temp_css" -o > "$css_combined_file"
-rm "$temp_css"
+    temp_css="$(mktemp /tmp/XXXXXXXXXX.css)"
 
-## Merge js_dir/* files into one then minify
-if [ -e "$js_combined_file" ]; then
-  rm "$js_combined_file"
-fi
+    for css_file in "$css_source_dir/"*.css; do
+      cat "$css_file" >> "$temp_css"
+    done
 
-for js_file in "$js_source_dir/"*.js; do
-  cat "$js_file" >> "$temp_js"
+    #warning "csstidy bug mangles media queries, skipping css compress"
+    #warning "http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=655984"
+    #cp "$temp_css" "$css_combined_file"
+    if [ -x yui-compressor ]; then
+      yui-compressor --type css "$temp_css" > "$css_combined_file"
+    else
+      warning "Optimization: yui-compressor not found, skipping"
+    fi
+
+    # Using cssoptimizer
+    # http://mabblog.com/cssoptimizer/download.html
+    #cssoptimizer "$temp_css" -o > "$css_combined_file"
+    rm "$temp_css"
+		break
+  fi
 done
 
-yui-compressor --type js "$temp_js" > "$js_combined_file"
-rm "$temp_js"
+# Check if any js files are newer than target, if so optimize
+for js_file in "$(ls "$js_source_dir/"*.js)"; do
+  if [ ! -e "$js_combined_file" ] || [ "$js_file" -nt "$js_combined_file" ] ; then
+    ## Merge js_dir/* files into one then minify
+    if [ -e "$js_combinded_file" ]; then
+      rm "$js_combined_file"
+    fi
 
+    temp_js="$(mktemp /tmp/XXXXXXXXXX.js)"
+
+    for js_file in "$js_source_dir/"*.js; do
+      cat "$js_file" >> "$temp_js"
+    done
+    if [ -x yui-compressor ]; then
+      yui-compressor --type js "$temp_js" > "$js_combined_file"
+    else
+      warning "Optimization: yui-compressor not found, skipping"
+    fi
+    rm "$temp_js"
+		break
+  fi
+done
 
 # HTML tidy
 # Remove include html files and copy from source before minifying
@@ -65,7 +115,38 @@ rm "$temp_js"
 #find "$site_dir" -name '*.html' -o -name '*.shtml' | while read file; do
 find "$site_dir" -type f | while read file; do
   if [[ "$(file -b "$file")" =~ ^HTML ]]; then
-    java -jar "$blog_dir/script/htmlcompressor-1.4.jar" --preserve-comments "$file" -o "$file"
-    sed -i 's/<!--\ [^-]*-->//g' "$file"
+
+    # Can only be two types of html, index* or 2000/01/01/post-title
+    # Need to get their source files to check if they should be optimized
+    source_file="${file#$site_dir/}"
+    optimize_file=0
+
+    if [[ "$source_file" =~ ^index ]]; then
+      optimize_file=1
+    else
+      # Hacky way of first removing site_dir, then stripping first 2
+      # slashes and replaceing the third with an underscore to find source file
+      source_file="${source_file%$html_extension}"
+      source_file="${source_file/\//}"
+      source_file="${source_file/\//}"
+      source_file="${source_file/\//_}"
+      source_file="$blog_dir/post_source/$source_file"
+      if [ -f "$source_file" ]; then
+        if [ "$source_file" -nt "$file" ]; then
+          optimize_file=1
+        fi
+      else
+        warning "Optimization: Target file \"$file\" is missing source file \"$source_file\", perhaps the target should be removed?"
+      fi
+    fi
+
+    if [ $optimize_file -eq 1 ]; then
+      if [ -x java ]; then
+        java -jar "$blog_dir/script/htmlcompressor-1.4.jar" --preserve-comments "$file" -o "$file"
+      else
+        warning 'Optimization: java not found, skipping'
+      fi
+      sed -i 's/<!--\ [^-]*-->//g' "$file"
+    fi
   fi
 done
