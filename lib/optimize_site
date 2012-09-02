@@ -132,16 +132,17 @@ find "$site_dir" -type f | while read file; do
       source_file="${source_file/\//_}"
       source_file="$blog_dir/post_source/$source_file"
       if [ -f "$source_file" ]; then
-        if [ "$source_file" -nt "$file" ]; then
+        #if [ "$source_file" -nt "$file" ]; then
           optimize_file=1
-        fi
+        #fi
       else
         warning "Optimization: Target file \"$file\" is missing source file \"$source_file\", perhaps the target should be removed?"
       fi
     fi
 
     if [ $optimize_file -eq 1 ]; then
-      if [ -x java ]; then
+      if [ -x /usr/bin/java ]; then
+echo Optimizing $file
         java -jar "$blog_dir/script/htmlcompressor-1.4.jar" --preserve-comments "$file" -o "$file"
       else
         warning 'Optimization: java not found, skipping'
